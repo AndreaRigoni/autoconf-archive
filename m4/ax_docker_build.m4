@@ -115,14 +115,10 @@ AC_DEFUN([AX_DOCKER_BUILD],[
 
     dk_set_user_env
     DK_WRITE_DSHELLFILE
-	dnl execute bootstrap in container
-	AS_IF([test -n "$1"],
-	 [AS_ECHO("Docker config - performing autogen: cd ${srcdir} && ./$1")]
-	 [$(cd ${srcdir} && ./$1)])
-	dnl configure in container
+    dnl configure in container
     DK_CONFIGURE
     dnl and exit
-	exit 0;
+    exit 0;
    ])
    ],[
    AS_VAR_SET_IF([DOCKER_CONTAINER],[
@@ -193,8 +189,9 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_CMD_CNTRUN], [
 		 done
 		])
 
+  AS_VAR_SET_IF([DOCKER_ENTRYPOINT],,AS_VAR_SET([DOCKER_ENTRYPOINT],${SHELL}))
   dnl run container
-  m4_normalize([ docker run -d -it --entrypoint=${SHELL} \
+  m4_normalize([ docker run -d -it --entrypoint=${DOCKER_ENTRYPOINT} \
                      -e USER=${USER} \
                      -e DISPLAY=${DISPLAY} \
                      -e http_proxy=${http_proxy} \
@@ -225,16 +222,16 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_CONFIGURE],[
          AS_VAR_SET([dk_configure_args])
          DK_GET_CONFIGURE_ARGS_WITHOUT_DOCKER([dk_configure_args])
          AS_VAR_APPEND([dk_configure_args],[" "])
-         AS_VAR_SET_IF([DOCKER_IMAGE],AS_VAR_APPEND([dk_configure_args],["DOCKER_IMAGE=\"${DOCKER_IMAGE}\" "]));
-         AS_VAR_SET_IF([DOCKER_CONTAINER],AS_VAR_APPEND([dk_configure_args],["DOCKER_CONTAINER=\"${DOCKER_CONTAINER}\" "]));
-         AS_VAR_SET_IF([DOCKER_FILE],AS_VAR_APPEND([dk_configure_args],["DOCKER_FILE=\"${DOCKER_FILE}\" "]));
+         AS_VAR_SET_IF([DOCKER_IMAGE],AS_VAR_APPEND([dk_configure_args],["DOCKER_IMAGE=\"${DOCKER_IMAGE}\" "]))
+         AS_VAR_SET_IF([DOCKER_CONTAINER],AS_VAR_APPEND([dk_configure_args],["DOCKER_CONTAINER=\"${DOCKER_CONTAINER}\" "]))
+         AS_VAR_SET_IF([DOCKER_FILE],AS_VAR_APPEND([dk_configure_args],["DOCKER_FILE=\"${DOCKER_FILE}\" "]))
 
 	 m4_pushdef([dk_configure_cmd], m4_normalize([
 	   ENABLE_KCONFIG=no
 	   docker exec -t
            --user ${USER}
-           ${DOCKER_CONTAINER} bash -l
-	   -c \"cd ${srcdir}\; autoreconf -f -W none\; cd $(pwd)\; DK_ADD_ESCAPE([ENABLE_KCONFIG=\"no\"]) ${0} DK_ADD_ESCAPE(${dk_configure_args}) DK_ADD_ESCAPE([HAVE_DOCKER=\"no\"]) \";
+		   ${DOCKER_CONTAINER} bash
+	   -c \"cd ${srcdir}\; cd $(pwd)\; DK_ADD_ESCAPE([ENABLE_KCONFIG=\"no\"]) ${0} DK_ADD_ESCAPE(${dk_configure_args}) DK_ADD_ESCAPE([HAVE_DOCKER=\"no\"]) \";
          ]))
 
          AS_ECHO(" ------------------------- ")
@@ -264,15 +261,15 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_SET_DOCKER_IMAGE], [
 
 dnl test_docker_container [cnt_name] [status] [action_if_yes] [action_if_no]
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_container_string],[
-          AS_VAR_SET([dk_cnt_status], $(docker ps -a -f name=$1 --format "{{.Status}}"))
-          AS_CONTAINS([${dk_cnt_status}],[$2],[$3],[$4])
+		  AS_VAR_SET([cnt_id], [$(docker ps -a -f name=$1 -q)])
+		  AS_VAR_SET([cnt_status], [$(docker ps -a -f name=$1 -f status=$2 -q)])
+		  AS_CONTAINS([${cnt_status}],[${cnt_id}],[$3],[$4])
          ])
 
 dnl test_docker_container_status [cnt_name] [status] [action_if_yes] [action_if_no]
 dnl status =  created, restarting, running, paused, exited
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_container_status],[
-         AS_VAR_SET([id_cnt_status],
-         $(docker ps -a -f name=$1 -f status=$2 --format "{{.ID}}"))
+         AS_VAR_SET([id_cnt_status],[$(docker ps -a -f name=$1 -f status=$2 -q)])
          AS_IF([test -n "${id_cnt_status}"],[eval $3], [eval $4])
 ])
 
@@ -295,11 +292,11 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_image_id],[
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_id],[
-         AS_VAR_SET([$1], $(docker ps -a -f name=$2 --format "{{.ID}}"))
+		 AS_VAR_SET([$1], [$(docker ps -a -f name=$2 -q)])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_image],[
-         AS_VAR_SET([$1], $(docker ps -a -f name=$2 --format "{{.Image}}"))
+		 AS_VAR_SET([$1], [$(docker inspect --format='{{.Config.Image}}')])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_image_exist],[
@@ -390,8 +387,9 @@ AS_VAR_READ([AX_DOCKER_BUILD_TARGETS],[
 # //// DOCKER TARGETS  /////////////////////////////////////////////////////// #
 # //////////////////////////////////////////////////////////////////////////// #
 
-DOCKER_CONTAINER = ${DOCKER_CONTAINER}
-DOCKER_IMAGE     = ${DOCKER_IMAGE}
+DOCKER_CONTAINER   = ${DOCKER_CONTAINER}
+DOCKER_IMAGE       = ${DOCKER_IMAGE}
+DOCKER_ENTRYPOINT ?= \${SHELL}
 
 user_id     = ${user_id}
 user_group  = ${user_group}
@@ -402,6 +400,7 @@ user_home   = ${user_home}
 docker_SHELL := \$(if \${MAKESHELL},\${MAKESHELL},\${abs_top_builddir}/dshell)
 local_SHELL  := \$(if \${SHELL},\${SHELL},/bin/sh)
 SHELL := \${docker_SHELL}
+\$(foreach x,\$(NODOCKERBUILD),\$(eval \$x: override SHELL=\${local_SHELL}))
 export SHELL
 
 .PHONY: docker
@@ -440,7 +439,7 @@ inspect:
 
 start:
 	@echo "Starting docker container:";
-	m4_normalize( docker run -d -it --entrypoint=\${SHELL}
+	m4_normalize( docker run -d -it --entrypoint=\${DOCKER_ENTRYPOINT}
 			     -e USER=\${USER}
 			     -e DISPLAY=\${DISPLAY}
 			     -e http_proxy=\${http_proxy}
@@ -452,6 +451,7 @@ start:
 			     -v \${user_home}:\${user_home}
 			     \$(foreach share,\${DOCKER_SHARES},-v \$(share) )
 			     -w \${abs_top_builddir}
+				 --privileged
 			     --name \${DOCKER_CONTAINER}
 			     \${DOCKER_IMAGE}; )
 	m4_normalize( docker exec --user root \${DOCKER_CONTAINER}
@@ -508,7 +508,7 @@ if [ -n "\${MAKESHELL}" ]; then
  \${MAKESHELL} \${quoted_args};
 else
  [ -t AS_ORIGINAL_STDIN_FD -o -t 0 ] && INT=-ti || INT=
- docker exec \${INT} --user \${USER} \${DOCKER_CONTAINER} /bin/bash -l -c "\$M_ENV cd \$(pwd); export MAKESHELL=/bin/bash; /bin/bash \${quoted_args}";
+ docker exec \${INT} --user \${USER} \${DOCKER_CONTAINER} /bin/bash -c "\$M_ENV cd \$(pwd); export MAKESHELL=/bin/bash; /bin/bash \${quoted_args}";
 fi
 ]))
 

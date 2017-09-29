@@ -66,7 +66,7 @@
 
 #serial 1
 
-AC_DEFUN([AX_DEFUN_LOCAL],
+m4_define([AX_DEFUN_LOCAL],
          [m4_defun([$1_$2],[$3])
           m4_append_uniq([$1_FUNCS],[[[$2]]],[,])])
 
