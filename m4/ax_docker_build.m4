@@ -267,8 +267,6 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_SET_DOCKER_IMAGE], [
 
 dnl test_docker_container [cnt_name] [status] [action_if_yes] [action_if_no]
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_container_string],[
-dnl          AS_VAR_SET([dk_cnt_status], $(docker ps -a -f name=$1 --format "{{.Status}}"))
-dnl          AS_CONTAINS([${dk_cnt_status}],[$2],[$3],[$4])
 		  AS_VAR_SET([cnt_id], $(docker ps -a -f name=$1 -q))
 		  AS_VAR_SET([cnt_status], $(docker ps -a -f name=$1 -f state=$2 -q))
 		  AS_CONTAINS([${cnt_status}],[${cnt_id}],[$3],[$4])
@@ -277,15 +275,13 @@ dnl          AS_CONTAINS([${dk_cnt_status}],[$2],[$3],[$4])
 dnl test_docker_container_status [cnt_name] [status] [action_if_yes] [action_if_no]
 dnl status =  created, restarting, running, paused, exited
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_container_status],[
-         AS_VAR_SET([id_cnt_status],
-dnl         $(docker ps -a -f name=$1 -f status=$2 --format "{{.ID}}"))
-		 $(docker ps -a -f name=$1 -f status=$2 -q))
+         AS_VAR_SET([id_cnt_status],[$(docker ps -a -f name=$1 -f status=$2 -q)])
          AS_IF([test -n "${id_cnt_status}"],[eval $3], [eval $4])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[test_docker_container_status],[
          if_docker_container_status([$1],[$2],
-            AS_SET_STATUS(0),AS_SET_STATUS(1))
+            [AS_SET_STATUS(0),AS_SET_STATUS(1)])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_status],[
@@ -298,28 +294,25 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_status],[
 
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_image_id],[
-         AS_VAR_SET([$1], $(docker images -a | ${AWK} -v _img=$2 {if ($1 ":" $2 == _img) {print $3}} ))
+         AS_VAR_SET([$1], [$(docker images -a | ${AWK} -v _img=$2 {if ($1 ":" $2 == _img) {print $3}} )])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_id],[
-dnl		 AS_VAR_SET([$1], $(docker ps -a -f name=$2 --format "{{.ID}}"))
-		 AS_VAR_SET([$1], $(docker ps -a -f name=$2 -q)
-])
+		 AS_VAR_SET([$1],[$(docker ps -a -f name=$2 -q)])])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_image],[
-dnl         AS_VAR_SET([$1], $(docker ps -a -f name=$2 --format "{{.Image}}"))
-		 AS_VAR_SET([$1], $(docker inspect --format='{{.Config.Image}}'))
+		 AS_VAR_SET([$1],[$(docker inspect $2 --format='{{.Config.Image}}')])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_image_exist],[
-          AS_VAR_SET([id_img_exist], $(docker images -a -q $1 ))
+          AS_VAR_SET([id_img_exist],[$(docker images -a -q $1 )])
           AS_IF([test -n "${id_img_exist}"],[eval $2], [eval $3])
 ])
 
 
 dnl start existing [container]
 AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_START_CNT],[
-  AS_VAR_SET([DOCKER_CONTAINER],$1)
+  AS_VAR_SET([DOCKER_CONTAINER],[$1])
   get_docker_container_status([dk_status],[${DOCKER_CONTAINER}])
   AS_CASE([${dk_status}],
         [running], [AS_ECHO("RUNNING")],
