@@ -404,9 +404,12 @@ user_home   = ${user_home}
 # if MAKESHELL is not defined use local dshell to enter docker container
 docker_SHELL := \$(if \${MAKESHELL},\${MAKESHELL},\${abs_top_builddir}/dshell)
 local_SHELL  := \$(if \${SHELL},\${SHELL},/bin/sh)
-SHELL := \${docker_SHELL}
+export SHELL := \${docker_SHELL}
 \$(foreach x,\$(NODOCKERBUILD),\$(eval \$x: override SHELL=\${local_SHELL}))
-export SHELL
+
+# fix local_SHELL for automake targets
+Makefile Makefile.in: SHELL = \$(local_SHELL)
+AUTOMAKE += --add-missing --copy -W none
 
 .PHONY: docker
 ifeq (docker,\$(MAKECMDGOALS))
