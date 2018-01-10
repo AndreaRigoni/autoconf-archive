@@ -194,8 +194,14 @@ dnl   AS_VAR_SET([user_groups],[$(id -G ${USER} | sed 's/ /,/g')])
 		  AS_VAR_APPEND([DOCKER_SHARES_VAR],"-v ${_share} ");
 		 done
 		])
-
-  AS_VAR_SET_IF([DOCKER_ENTRYPOINT],,AS_VAR_SET([DOCKER_ENTRYPOINT],${SHELL}))
+  AS_VAR_SET_IF([DOCKER_NETWORKS],[
+		 for _n in ${DOCKER_NETWORKS}; do
+		  AS_VAR_APPEND([DOCKER_NETWORKS_VAR],"--network=$_n ");
+		 done
+		])
+  AS_ECHO("DOCKER_ENTRYPOINT->|${DOCKER_ENTRYPOINT}|")
+  AS_IF([test -n "${DOCKER_ENTRYPOINT}"],,AS_VAR_SET([DOCKER_ENTRYPOINT],${SHELL}))
+  AS_ECHO("DOCKER_ENTRYPOINT->|${DOCKER_ENTRYPOINT}|")
   dnl run container
   m4_normalize([ docker run -d -it --entrypoint=${DOCKER_ENTRYPOINT} \
                      -e USER=${USER} \
@@ -207,7 +213,8 @@ dnl   AS_VAR_SET([user_groups],[$(id -G ${USER} | sed 's/ /,/g')])
                      -v ${abs_srcdir}:${abs_srcdir} \
                      -v ${user_home}:${user_home} \
                      -v $(pwd):$(pwd) \
-		     ${DOCKER_SHARES_VAR} \
+					 ${DOCKER_SHARES_VAR} \
+					 ${DOCKER_NETWORKS_VAR} \
                      -w $(pwd) \
                      --name $2 \
                      $1;
@@ -334,7 +341,6 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_START_IMGCNT], [
    DK_SET_DOCKER_CONTAINER
    DK_GET_CONFIGURE_ARGS([dk_configure_args])
 
-
    AS_ECHO("Pulling image: $1")
    docker pull $1;
 
@@ -452,12 +458,14 @@ start:
 			     -e DISPLAY=\${DISPLAY}
 			     -e http_proxy=\${http_proxy}
 			     -e https_proxy=\${https_proxy}
+				 -e PS1="\${DOCKER_PS1}"
 			     -v /tmp/.X11-unix:/tmp/.X11-unix
 			     -v /etc/resolv.conf:/etc/resolv.conf
 			     -v \${abs_top_srcdir}:\${abs_top_srcdir}
 			     -v \${abs_top_builddir}:\${abs_top_builddir}
 			     -v \${user_home}:\${user_home}
 			     \$(foreach share,\${DOCKER_SHARES},-v \$(share) )
+				 \$(foreach net,\${DOCKER_NETWORKS},--network=\$(net) )
 			     -w \${abs_top_builddir}
 				 --privileged
 			     --name \${DOCKER_CONTAINER}
@@ -476,7 +484,7 @@ stop:
 shell:
 	@echo "Starting docker shell";
 	docker exec -ti --user \${USER} \${DOCKER_CONTAINER} \
-	 \${SHELL} -c "cd \$(shell pwd); export MAKESHELL=\${SHELL}; bash"
+	 \${SHELL} -c "cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash"
 
 endif
 
