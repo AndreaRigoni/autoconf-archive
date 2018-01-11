@@ -235,16 +235,22 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_CONFIGURE],[
          AS_VAR_SET([dk_configure_args])
          DK_GET_CONFIGURE_ARGS_WITHOUT_DOCKER([dk_configure_args])
          AS_VAR_APPEND([dk_configure_args],[" "])
-         AS_VAR_SET_IF([DOCKER_IMAGE],AS_VAR_APPEND([dk_configure_args],["DOCKER_IMAGE=\"${DOCKER_IMAGE}\" "]))
-         AS_VAR_SET_IF([DOCKER_CONTAINER],AS_VAR_APPEND([dk_configure_args],["DOCKER_CONTAINER=\"${DOCKER_CONTAINER}\" "]))
-         AS_VAR_SET_IF([DOCKER_FILE],AS_VAR_APPEND([dk_configure_args],["DOCKER_FILE=\"${DOCKER_FILE}\" "]))
+		 AS_VAR_SET_IF([DOCKER_IMAGE],AS_VAR_APPEND([dk_configure_args],
+		  ["DOCKER_IMAGE=\"${DOCKER_IMAGE}\" "]))
+		 AS_VAR_SET_IF([DOCKER_CONTAINER],AS_VAR_APPEND([dk_configure_args],
+		  ["DOCKER_CONTAINER=\"${DOCKER_CONTAINER}\" "]))
+		 AS_VAR_SET_IF([DOCKER_FILE],AS_VAR_APPEND([dk_configure_args],
+		  ["DOCKER_FILE=\"${DOCKER_FILE}\" "]))
 
 	 m4_pushdef([dk_configure_cmd], m4_normalize([
 	   ENABLE_KCONFIG=no
 	   docker exec -t
            --user ${USER}
-           ${DOCKER_CONTAINER} bash
-	   -c \"cd ${srcdir}\; cd $(pwd)\; DK_ADD_ESCAPE([ENABLE_KCONFIG=\"no\"]) ${0} DK_ADD_ESCAPE(${dk_configure_args}) DK_ADD_ESCAPE([HAVE_DOCKER=\"no\"]) \";
+		   ${DOCKER_CONTAINER} bash -l
+	   -c \"cd ${srcdir}\; cd $(pwd)\;
+		DK_ADD_ESCAPE([ENABLE_KCONFIG=\"no\"])
+		DK_ADD_ESCAPE([HAVE_DOCKER=\"no\"])
+		${0} DK_ADD_ESCAPE(${dk_configure_args}) \";
          ]))
 
          AS_ECHO(" ------------------------- ")
@@ -484,7 +490,7 @@ stop:
 shell:
 	@echo "Starting docker shell";
 	docker exec -ti --user \${USER} \${DOCKER_CONTAINER} \
-	 \${SHELL} -c "cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash"
+	 \${SHELL} -c "cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash -l "
 
 endif
 
@@ -524,7 +530,7 @@ if [ -n "\${MAKESHELL}" ]; then
  \${MAKESHELL} \${quoted_args};
 else
  [ -t AS_ORIGINAL_STDIN_FD -o -t 0 ] && INT=-ti || INT=
- docker exec \${INT} --user \${USER} \${DOCKER_CONTAINER} /bin/bash -c "save_path=\\\\\$PATH; \$M_ENV export PATH=\\\\\$save_path; cd \$(pwd); export MAKESHELL=/bin/bash; /bin/bash \${quoted_args}";
+ docker exec \${INT} --user \${USER} \${DOCKER_CONTAINER} /bin/bash -l -c "save_path=\\\\\$PATH; \$M_ENV export PATH=\\\\\$save_path; cd \$(pwd); export MAKESHELL=/bin/bash; /bin/bash \${quoted_args}";
 fi
 ]))
 
