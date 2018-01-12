@@ -420,7 +420,7 @@ export SHELL := \${docker_SHELL}
 \$(foreach x,\$(NODOCKERBUILD),\$(eval \$x: override SHELL=\${local_SHELL}))
 
 # fix local_SHELL for automake targets
-Makefile Makefile.in \$(ACLOCAL_M4) \$(top_srcdir)/configure: SHELL = \$(local_SHELL)
+Makefile Makefile.in \$(ACLOCAL_M4) \$(top_srcdir)/configure am--refresh: SHELL = \$(local_SHELL)
 AUTOMAKE += --add-missing --copy -W none
 
 .PHONY: docker
