@@ -453,11 +453,11 @@ ifeq (docker,\$(filter docker,\$(MAKECMDGOALS)))
 export SHELL = \${local_SHELL}
 
 .PHONY: info start stop shell inspect run
-inspect:
+inspect: ##@docker inspect running container properties
 	@echo "info:";
 	docker inspect \${DOCKER_CONTAINER}
 
-start:
+start: ##@docker start new session of configured container
 	@echo "Starting docker container:";
 	m4_normalize( docker run -d -it --entrypoint=\${DOCKER_ENTRYPOINT}
 			     -e USER=\${USER}
@@ -482,12 +482,12 @@ start:
 				    useradd -d \${user_home} -u \${user_id} -g \${user_group} \${USER};
 				  ";)
 
-stop:
+stop: ##@docker stop running container session
 	@echo "Stopping docker container:";
 	docker stop \${DOCKER_CONTAINER};
 	docker rm \${DOCKER_CONTAINER};
 
-shell:
+shell: ##@docker start a shell inside running container (use: USER=root for privleges)
 	@echo "Starting docker shell";
 	docker exec -ti --user \${USER} \${DOCKER_CONTAINER} \
 	 \${SHELL} -c "cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash -l "
