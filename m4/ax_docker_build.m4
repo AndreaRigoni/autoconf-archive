@@ -316,7 +316,7 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_id],[
 		 AS_VAR_SET([$1],[$(docker ps -a -f name=$2 -q)])])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_image],[
-		 AS_VAR_SET([$1],[$(docker inspect $2 --format='{{.Config.Image}}')])
+		 AS_VAR_SET([$1],[$(docker inspect --format='{{.Config.Image}}' $2)])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_image_exist],[
