@@ -206,6 +206,7 @@ dnl   AS_VAR_SET([user_groups],[$(id -G ${USER} | sed 's/ /,/g')])
   m4_normalize([ docker run -d -it --entrypoint=${DOCKER_ENTRYPOINT} \
                      -e USER=${USER} \
                      -e DISPLAY=${DISPLAY} \
+					 -e LANG=${LANG} \
                      -e http_proxy=${http_proxy} \
                      -e https_proxy=${https_proxy} \
                      -v /tmp/.X11-unix:/tmp/.X11-unix \
@@ -223,6 +224,7 @@ dnl   AS_VAR_SET([user_groups],[$(id -G ${USER} | sed 's/ /,/g')])
   m4_normalize([ docker exec --user root $2 ${SHELL} -c "
 			  groupadd -g ${user_group} ${USER};
 			  useradd -d ${user_home} -u ${user_id} -g ${user_group} ${USER};
+			  locale-gen ${LANG}
                          ";
                ])
 ])
@@ -462,6 +464,7 @@ start: ##@docker start new session of configured container
 	m4_normalize( docker run -d -it --entrypoint=\${DOCKER_ENTRYPOINT}
 			     -e USER=\${USER}
 			     -e DISPLAY=\${DISPLAY}
+				 -e LANG=\${LANG}
 			     -e http_proxy=\${http_proxy}
 			     -e https_proxy=\${https_proxy}
 				 -e PS1="\${DOCKER_PS1}"
@@ -480,6 +483,7 @@ start: ##@docker start new session of configured container
 				  \${SHELL} -c "
 				    groupadd -g \${user_group} \${USER};
 				    useradd -d \${user_home} -u \${user_id} -g \${user_group} \${USER};
+					locale-gen \$\${LANG};
 				  ";)
 
 stop: ##@docker stop running container session
