@@ -527,7 +527,7 @@ user_home=${user_home}
 export SHELL=/bin/bash
 export M_PATH=\$PATH
 M_ENV="\$(export -p | awk '{printf("%s; ",\@S|@0)}')"
-xhost +localhost > /dev/null
+xhost local:${USER} > /dev/null
 >&2 echo "Docker: Entering container \${DOCKER_CONTAINER} ";
 quoted_args="\$(printf " %q" "\$\@")"
 if [ -n "\${MAKESHELL}" ]; then
