@@ -82,11 +82,32 @@ AC_DEFUN([AX_DOCKER_BUILD],[
                [AS_VAR_SET_IF([DOCKER_URL],
                               [AS_VAR_SET([with_docker_url], ["${DOCKER_URL}"])],
                               [])])
-   AS_VAR_SET_IF([with_docker_url],
+   AS_VAR_SET_IF([with_docker_url],[
    AS_IF( [test x"${with_docker_url}" != x"no"],
           [AS_VAR_SET([DOCKER_URL],["${with_docker_url}"])],
           [AS_UNSET([DOCKER_URL])]
-          ))
+		  )])
+
+
+
+   AC_ARG_WITH(docker-profile,
+			[AS_HELP_STRING([--with-docker-profile],[specify docker profile])],
+			[],
+			[AS_VAR_SET_IF([DOCKER_PROFILE],
+						   [AS_VAR_SET([with_docker_profile], ["${DOCKER_PROFILE}"])],
+						   [])])
+   AC_ARG_ENABLE(debug)
+   AS_VAR_SET_IF([enable_debug],[
+	 AS_VAR_IF([enable_debug],[no],,[
+	   AS_VAR_SET_IF([with_docker_profile],,[
+		 AS_VAR_IF([enable_debug],[yes],AS_VAR_SET([with_docker_profile],[debug]),
+										AS_VAR_SET([with_docker_profile],[${enable_debug}]))])
+										])])
+   AS_VAR_SET_IF([with_docker_profile],[
+   AS_IF( [test x"${with_docker_profile}" != x"no"],
+		 [AS_VAR_SET([DOCKER_PROFILE],["${with_docker_profile}"])],
+		 [AS_UNSET([DOCKER_PROFILE])]
+		 )])
 
 
    AS_VAR_IF([HAVE_DOCKER],[yes], [
@@ -176,47 +197,56 @@ dnl AS_VAR_SET([user_groups],[$(id -G ${USER} | sed 's/ /,/g')])
 AS_VAR_SET([user_home],${HOME})
 AS_VAR_SET([abs_builddir],[$(pwd)])
 AS_VAR_SET([abs_srcdir],[$(cd ${srcdir}; pwd)])
+
+# Docker profiles
+AS_VAR_SET([DOCKER_PROFILE_debug],["--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"])
+AC_SUBST([DOCKER_PROFILE_debug])
 ])
+
+
+
 
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_CMD_CNTRUN], [
   dnl set user variables
-dnl   AS_VAR_SET([user_entry], [$(awk -F: "{if (\$[]1 == \"${USER}\") {print \$[]0} }" /etc/passwd)])
-  AS_VAR_SET([user_id],    [$(id -u)])
-  AS_VAR_SET([user_group], [$(id -g)])
-dnl   AS_VAR_SET([user_home],  [$(echo ${user_entry} | awk -F: '{print $[]6}')])
-dnl   AS_VAR_SET([group_entry],[$(awk -F: "{if (\$[]3 == \"${user_group}\") {print \$[]0} }" /etc/group)])
-dnl   AS_VAR_SET([user_groups],[$(id -G ${USER} | sed 's/ /,/g')])
-  AS_VAR_SET([user_home],${HOME})
-  AS_VAR_SET([abs_srcdir],[$(cd ${srcdir}; pwd)])
-  AS_VAR_SET_IF([DOCKER_SHARES],[
+  dk_set_user_env
+  AS_IF([test -n "${DOCKER_SHARES}"],[
 		 for _share in ${DOCKER_SHARES}; do
 		  AS_VAR_APPEND([DOCKER_SHARES_VAR],"-v ${_share} ");
 		 done
 		])
-  AS_VAR_SET_IF([DOCKER_NETWORKS],[
+  AS_IF([test -n "${DOCKER_NETWORKS}"],[
 		 for _n in ${DOCKER_NETWORKS}; do
 		  AS_VAR_APPEND([DOCKER_NETWORKS_VAR],"--network=$_n ");
 		 done
 		])
-  AS_ECHO("DOCKER_ENTRYPOINT->|${DOCKER_ENTRYPOINT}|")
+  AS_IF([test -n "${DOCKER_PROFILE}"],[
+		  AS_VAR_SET([DOCKER_PROFILE_VAR],[$(eval echo \${DOCKER_PROFILE_${DOCKER_PROFILE}})])
+		  AS_ECHO("DOCKER_PROFILE: ${DOCKER_PROFILE}")
+		  AS_ECHO("DOCKER_PROFILE_VAR: ${DOCKER_PROFILE_VAR}")
+		  ])
   AS_IF([test -n "${DOCKER_ENTRYPOINT}"],,AS_VAR_SET([DOCKER_ENTRYPOINT],${SHELL}))
   AS_ECHO("DOCKER_ENTRYPOINT->|${DOCKER_ENTRYPOINT}|")
   dnl run container
-  m4_normalize([ docker run -d -it --entrypoint=${DOCKER_ENTRYPOINT} \
-                     -e USER=${USER} \
-                     -e DISPLAY=${DISPLAY} \
-                     -e http_proxy=${http_proxy} \
-                     -e https_proxy=${https_proxy} \
-                     -v /tmp/.X11-unix:/tmp/.X11-unix \
-                     -v /etc/resolv.conf:/etc/resolv.conf \
-                     -v ${abs_srcdir}:${abs_srcdir} \
-                     -v ${user_home}:${user_home} \
-                     -v $(pwd):$(pwd) \
-					 ${DOCKER_SHARES_VAR} \
-					 ${DOCKER_NETWORKS_VAR} \
-                     -w $(pwd) \
-                     --name $2 \
+  m4_normalize([docker run -d -it --entrypoint=${DOCKER_ENTRYPOINT}
+					 -e USER=${USER}
+					 -e DISPLAY=${DISPLAY}
+					 -e LANG=${LANG}
+					 -e http_proxy=${http_proxy}
+					 -e https_proxy=${https_proxy}
+					 -v /tmp/.X11-unix:/tmp/.X11-unix
+					 -v /etc/resolv.conf:/etc/resolv.conf
+					 -v ${abs_srcdir}:${abs_srcdir}
+					 -v ${user_home}:${user_home}
+					 -v $(pwd):$(pwd)
+					 -v /sys/fs/cgroup:/sys/fs/cgroup:ro
+					 --tmpfs /run --tmpfs /run/lock
+					 --cap-add=SYS_ADMIN
+					 ${DOCKER_SHARES_VAR}
+					 ${DOCKER_NETWORKS_VAR}
+					 ${DOCKER_PROFILE_VAR}
+					 -w $(pwd)
+					 --name $2
                      $1;
                ])
   dnl set user option inside container
@@ -314,7 +344,7 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_id],[
 		 AS_VAR_SET([$1],[$(docker ps -a -f name=$2 -q)])])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_image],[
-		 AS_VAR_SET([$1],[$(docker inspect $2 --format='{{.Config.Image}}')])
+		 AS_VAR_SET([$1],[$(docker inspect --format='{{.Config.Image}}' $2)])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_image_exist],[
@@ -363,7 +393,7 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_START_IMGCNT], [
 
    dnl find if container exists or start it
    AS_IF([test -n "${dk_id}"],,
-         [AS_ECHO("CREATE ")];[DK_CMD_CNTRUN($1,${DOCKER_CONTAINER})])
+		 [AS_ECHO("CREATING NEW CONTAINER... ")];[DK_CMD_CNTRUN($1,${DOCKER_CONTAINER})])
    DK_START_CNT(${DOCKER_CONTAINER})
 ])
 
@@ -407,6 +437,7 @@ AS_VAR_READ([AX_DOCKER_BUILD_TARGETS],[
 DOCKER_CONTAINER   = ${DOCKER_CONTAINER}
 DOCKER_IMAGE       = ${DOCKER_IMAGE}
 DOCKER_ENTRYPOINT ?= \${SHELL}
+DOCKER_PS1        ?= [[\\\u@${DOCKER_IMAGE}:\\\h \\\W]]\$
 
 user_id     = ${user_id}
 user_group  = ${user_group}
@@ -453,15 +484,16 @@ ifeq (docker,\$(filter docker,\$(MAKECMDGOALS)))
 export SHELL = \${local_SHELL}
 
 .PHONY: info start stop shell inspect run
-inspect:
+inspect: ##@docker inspect running container properties
 	@echo "info:";
 	docker inspect \${DOCKER_CONTAINER}
 
-start:
+start: ##@docker start new session of configured container
 	@echo "Starting docker container:";
 	m4_normalize( docker run -d -it --entrypoint=\${DOCKER_ENTRYPOINT}
 			     -e USER=\${USER}
 			     -e DISPLAY=\${DISPLAY}
+				 -e LANG=\${LANG}
 			     -e http_proxy=\${http_proxy}
 			     -e https_proxy=\${https_proxy}
 				 -e PS1="\${DOCKER_PS1}"
@@ -470,8 +502,12 @@ start:
 			     -v \${abs_top_srcdir}:\${abs_top_srcdir}
 			     -v \${abs_top_builddir}:\${abs_top_builddir}
 			     -v \${user_home}:\${user_home}
+				 -v /sys/fs/cgroup:/sys/fs/cgroup:ro
+				 --tmpfs /run  --tmpfs /run/lock
+				 --cap-add=SYS_ADMIN
 			     \$(foreach share,\${DOCKER_SHARES},-v \$(share) )
 				 \$(foreach net,\${DOCKER_NETWORKS},--network=\$(net) )
+				 \${DOCKER_PROFILE_\${DOCKER_PROFILE}}
 			     -w \${abs_top_builddir}
 				 --privileged
 			     --name \${DOCKER_CONTAINER}
@@ -482,12 +518,12 @@ start:
 				    useradd -d \${user_home} -u \${user_id} -g \${user_group} \${USER};
 				  ";)
 
-stop:
+stop: ##@docker stop running container session
 	@echo "Stopping docker container:";
 	docker stop \${DOCKER_CONTAINER};
 	docker rm \${DOCKER_CONTAINER};
 
-shell:
+shell: ##@docker start a shell inside running container (use: USER=root for privleges)
 	@echo "Starting docker shell";
 	docker exec -ti --user \${USER} \${DOCKER_CONTAINER} \
 	 \${SHELL} -c "cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash -l "
@@ -523,7 +559,7 @@ user_home=${user_home}
 export SHELL=/bin/bash
 export M_PATH=\$PATH
 M_ENV="\$(export -p | awk '{printf("%s; ",\@S|@0)}')"
-
+xhost local:${USER} > /dev/null
 >&2 echo "Docker: Entering container \${DOCKER_CONTAINER} ";
 quoted_args="\$(printf " %q" "\$\@")"
 if [ -n "\${MAKESHELL}" ]; then
