@@ -109,7 +109,6 @@ AC_DEFUN([AX_DOCKER_BUILD],[
 		 [AS_UNSET([DOCKER_PROFILE])]
 		 )])
 
-
    AS_VAR_IF([HAVE_DOCKER],[yes], [
    AS_VAR_SET_IF([DOCKER_URL],
     [AS_BANNER(["BUILDING IMAGE FOR URL: ${DOCKER_URL}"])
@@ -242,6 +241,7 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_CMD_CNTRUN], [
 					 -v /sys/fs/cgroup:/sys/fs/cgroup:ro
 					 --tmpfs /run --tmpfs /run/lock
 					 --cap-add=SYS_ADMIN
+					 ${DOCKER_RUNARGS}
 					 ${DOCKER_SHARES_VAR}
 					 ${DOCKER_NETWORKS_VAR}
 					 ${DOCKER_PROFILE_VAR}
@@ -509,6 +509,7 @@ start: ##@docker start new session of configured container
 				 \$(foreach net,\${DOCKER_NETWORKS},--network=\$(net) )
 				 \${DOCKER_PROFILE_\${DOCKER_PROFILE}}
 			     -w \${abs_top_builddir}
+				 \${DOCKER_RUNARGS}
 				 --privileged
 			     --name \${DOCKER_CONTAINER}
 			     \${DOCKER_IMAGE}; )
@@ -523,10 +524,11 @@ stop: ##@docker stop running container session
 	docker stop \${DOCKER_CONTAINER};
 	docker rm \${DOCKER_CONTAINER};
 
+shell: export SHELL = \${docker_SHELL}
 shell: ##@docker start a shell inside running container (use: USER=root for privleges)
-	@echo "Starting docker shell";
-	docker exec -ti --user \${USER} \${DOCKER_CONTAINER} \
-	 \${SHELL} -c "cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash -l "
+	\$(info "Starting docker shell")
+##	docker exec -ti --user \${USER} \${DOCKER_CONTAINER} \${SHELL} -c
+	@ cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash -l
 
 endif
 
@@ -561,7 +563,7 @@ export M_PATH=\$PATH
 M_ENV="\$(export -p | awk '{printf("%s; ",\@S|@0)}')"
 xhost local:${USER} > /dev/null
 >&2 echo "Docker: Entering container \${DOCKER_CONTAINER} ";
-quoted_args="\$(printf " %q" "\$\@")"
+quoted_args="\$(printf " %q" "\$\@" | sed 's/\\\\\\\\,/,/g')"
 if [ -n "\${MAKESHELL}" ]; then
  \${MAKESHELL} \${quoted_args};
 else
