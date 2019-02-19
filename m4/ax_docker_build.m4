@@ -48,14 +48,13 @@
 
 AC_DEFUN([AX_DOCKER_BUILD],[
    AX_PUSH_LOCAL([m4_ax_docker_build])
-
    AS_VAR_SET_IF([HAVE_DOCKER],,
       AC_CHECK_PROG([HAVE_DOCKER],[docker],[yes],[no]))
 
    AC_ARG_WITH(docker-image,
                [AS_HELP_STRING([--with-docker-image],[specify docker images])],
                [],
-               [AS_VAR_SET_IF([DOCKER_IMAGE],
+               [AS_IF([test -n "${DOCKER_IMAGE}"], dnl AS_VAR_SET_IF([DOCKER_IMAGE],
                               [AS_VAR_SET([with_docker_image], ["${DOCKER_IMAGE}"])],
                               [])])
    AS_VAR_SET_IF([with_docker_image],
@@ -67,7 +66,7 @@ AC_DEFUN([AX_DOCKER_BUILD],[
    AC_ARG_WITH(docker-container,
                [AS_HELP_STRING([--with-docker-container],[specify docker container])],
                [],
-               [AS_VAR_SET_IF([DOCKER_CONTAINER],
+               [AS_IF([test -n "${DOCKER_CONTAINER}"], dnl AS_VAR_SET_IF([DOCKER_CONTAINER],
                               [AS_VAR_SET([with_docker_container], ["${DOCKER_CONTAINER}"])],
                               [])])
    AS_VAR_SET_IF([with_docker_container],
@@ -79,7 +78,7 @@ AC_DEFUN([AX_DOCKER_BUILD],[
    AC_ARG_WITH(docker-url,
                [AS_HELP_STRING([--with-docker-url],[specify docker url])],
                [],
-               [AS_VAR_SET_IF([DOCKER_URL],
+               [AS_IF([test -n "${DOCKER_URL}"], dnl AS_VAR_SET_IF([DOCKER_URL],
                               [AS_VAR_SET([with_docker_url], ["${DOCKER_URL}"])],
                               [])])
    AS_VAR_SET_IF([with_docker_url],[
@@ -87,8 +86,6 @@ AC_DEFUN([AX_DOCKER_BUILD],[
           [AS_VAR_SET([DOCKER_URL],["${with_docker_url}"])],
           [AS_UNSET([DOCKER_URL])]
 		  )])
-
-
 
    AC_ARG_WITH(docker-profile,
 			[AS_HELP_STRING([--with-docker-profile],[specify docker profile])],
@@ -110,26 +107,26 @@ AC_DEFUN([AX_DOCKER_BUILD],[
 		 )])
 
    AS_VAR_IF([HAVE_DOCKER],[yes], [
-   AS_VAR_SET_IF([DOCKER_URL],
+   AS_IF([test -n "${DOCKER_URL}"],dnl AS_VAR_SET_IF([DOCKER_URL],
     [AS_BANNER(["BUILDING IMAGE FOR URL: ${DOCKER_URL}"])
      DK_SET_DOCKER_IMAGE
      DK_START_URL(${DOCKER_URL},${DOCKER_IMAGE})])
 
-   AS_VAR_SET_IF([DOCKER_IMAGE],
+   AS_IF([test -n "${DOCKER_IMAGE}"],dnl AS_VAR_SET_IF([DOCKER_IMAGE],
     [AS_BANNER(["STARTING CONTAINER IN DOCKER IMAGE: ${DOCKER_IMAGE}"])
      DK_START_IMGCNT(${DOCKER_IMAGE})],
-    [AS_VAR_SET_IF([DOCKER_CONTAINER],
+    [AS_IF([test -n "${DOCKER_CONTAIER}"],dnl AS_VAR_SET_IF([DOCKER_CONTAINER],
      [AS_BANNER(["STARTING CONTAINER: ${DOCKER_CONTAINER}"])
       DK_START_CNT(${DOCKER_CONTAINER})])
     ])
 
-   AS_VAR_SET_IF([DOCKER_CONTAINER],[
+   AS_IF([test -n "${DOCKER_CONTAINER}"],dnl AS_VAR_SET_IF([DOCKER_CONTAINER],[
                   dk_set_user_env
                   DK_WRITE_DSHELLFILE
                   DK_SET_TARGETS
                  ])
 
-   AS_VAR_SET_IF([DOCKER_CONTAINER],[
+   AS_IF([test -n "${DOCKER_CONTAINER}"],dnl AS_VAR_SET_IF([DOCKER_CONTAINER],[
     AS_BANNER(["EXECUTING CONFIGURE IN DOCKER CONTAINER: ${DOCKER_CONTAINER}"])
     _dk_set_docker_build_debug
 
@@ -145,7 +142,7 @@ AC_DEFUN([AX_DOCKER_BUILD],[
 	exit 0;
    ])
    ],[
-   AS_VAR_SET_IF([DOCKER_CONTAINER],[
+   AS_IF([test -n "${DOCKER_CONTAINER}"],dnl AS_VAR_SET_IF([DOCKER_CONTAINER],[
                    dk_set_user_env
                    DK_SET_TARGETS
                   ])
@@ -344,7 +341,9 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_id],[
 		 AS_VAR_SET([$1],[$(docker ps -a -f name=$2 -q)])])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[get_docker_container_image],[
-		 AS_VAR_SET([$1],[$(docker inspect --format='{{.Config.Image}}' $2)])
+		 AS_IF([test -n "$2"],[
+        AS_VAR_SET([$1],[$(docker inspect --format='{{.Config.Image}}' $2)])
+       ])
 ])
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[if_docker_image_exist],[
@@ -384,7 +383,7 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_START_IMGCNT], [
 
    dnl find if container exists and belongs to selected image
    get_docker_container_id([dk_id],${DOCKER_CONTAINER})
-   get_docker_container_image([dk_img],${DOCKER_CONTAINER})
+   get_docker_container_image([dk_img],[${DOCKER_CONTAINER}])
    AS_ECHO("id: ${dk_id} img: ${dk_img}")
    AS_IF([test -n "${dk_id}" -a -n "${dk_img}"],
          [AS_IF([test x"${dk_img}" == x"$1"],
@@ -420,11 +419,6 @@ AX_DEFUN_LOCAL([m4_ax_docker_build],[_dk_set_docker_build_debug],[
          AS_ECHO(" ac_configure_args = ${ac_configure_args}")
          AS_ECHO(" --------------------------------- ")
          ])
-
-
-
-
-
 
 
 AX_DEFUN_LOCAL([m4_ax_docker_build],[DK_SET_TARGETS],[
@@ -562,7 +556,7 @@ export SHELL=/bin/bash
 export M_PATH=\$PATH
 
 M_ENV="\$(export -p | awk '!/( PATH=)|( XDG_)/ {printf("%s; ",\@S|@0)}')"
-xhost local:${USER} > /dev/null
+xhost local:${USER} 2>&1 > /dev/null
 >&2 echo "Docker: Entering container \${DOCKER_CONTAINER} ";
 quoted_args="\$(printf " %q" "\$\@" | sed 's/\\\\\\\\,/,/g')"
 if [ -n "\${MAKESHELL}" ]; then
