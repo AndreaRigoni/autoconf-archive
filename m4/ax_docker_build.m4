@@ -431,7 +431,7 @@ AS_VAR_READ([AX_DOCKER_BUILD_TARGETS],[
 DOCKER_CONTAINER   = ${DOCKER_CONTAINER}
 DOCKER_IMAGE       = ${DOCKER_IMAGE}
 DOCKER_ENTRYPOINT ?= \${SHELL}
-DOCKER_PS1        ?= [[\\\u@${DOCKER_IMAGE}:\\\h \\\W]]\$
+DOCKER_PS1        ?= [[\\\u@\\\h:${DOCKER_IMAGE} \\\W]]\$
 
 user_id     = ${user_id}
 user_group  = ${user_group}
@@ -439,10 +439,11 @@ user_groups = ${user_groups}
 user_home   = ${user_home}
 
 # if MAKESHELL is not defined use local dshell to enter docker container
-docker_SHELL := \$(if \${MAKESHELL},\${MAKESHELL},\${abs_top_builddir}/dshell)
-local_SHELL  := \$(if \${SHELL},\${SHELL},/bin/sh)
-export SHELL := \${docker_SHELL}
-\$(foreach x,\$(NODOCKERBUILD),\$(eval \$x: override SHELL=\${local_SHELL}))
+docker_SHELL  := \$(if \${MAKESHELL},\${MAKESHELL},\${abs_top_builddir}/dshell)
+local_SHELL   := \$(if \${SHELL},\${SHELL},/bin/sh)
+SHELL  := \${docker_SHELL}
+## \$(foreach x,\$(NODOCKERBUILD),\$(eval \$x: override SHELL=\${local_SHELL}))
+\$(filter-out \$(ak__DOCKER_TARGETS),\$(NODOCKERBUILD)): override SHELL = \${local_SHELL}
 
 # fix local_SHELL for automake targets
 Makefile Makefile.in \$(ACLOCAL_M4) \$(top_srcdir)/configure am--refresh: SHELL = \$(local_SHELL)
@@ -522,7 +523,7 @@ shell: export SHELL = \${docker_SHELL}
 shell: ##@docker start a shell inside running container (use: USER=root for privleges)
 	\$(info "Starting docker shell")
 ##	docker exec -ti --user \${USER} \${DOCKER_CONTAINER} \${SHELL} -c
-	@ cd \$(shell pwd); export MAKESHELL=\${SHELL}; export PS1='\${DOCKER_PS1} '; bash -l
+	@ cd \$(shell pwd); export MAKESHELL=\${SHELL}; bash --rcfile <(cat ${HOME}/.bashrc; echo 'PS1="\$(DOCKER_PS1) "')
 
 endif
 
